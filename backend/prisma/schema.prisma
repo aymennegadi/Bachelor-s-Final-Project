@@ -1,0 +1,143 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum EtatEquipement {
+    NEUF
+    BON_ETAT
+    EN_PANNE
+    EN_MAINTENANCE
+    REFORME
+}
+
+enum TypeDemande {
+    ACHAT
+    REMPLACEMENT
+    REFORME
+    EQUIPEMENT
+    SALLE
+    SIGNALEMENT
+    EMPRUNT
+    LABORATOIRE
+}
+
+enum StatutDemande {
+    EN_ATTENTE
+    VALIDEE
+    REFUSEE
+    RECEPTIONNEE
+    AFFECTEE
+}
+
+enum TypeMouvement {
+    ENTREE
+    SORTIE
+    TRANSFERT
+}
+
+model Role {
+    id           Int           @id @default(autoincrement())
+    nom          String        @unique
+    utilisateurs Utilisateur[]
+}
+
+model Utilisateur {
+    id            Int      @id @default(autoincrement())
+    nom           String
+    prenom        String
+    email         String   @unique
+    telephone     String?
+    mot_de_passe  String
+    date_creation DateTime @default(now())
+
+    role_id Int
+    role    Role @relation(fields: [role_id], references: [id])
+
+    laboratoire  Laboratoire?  @relation("ResponsableLabo")
+    demandes     Demande[]     @relation("Demandeur")
+    validations  Demande[]     @relation("Valideur")
+    mouvements   Mouvement[]   @relation("Magasinier")
+    signalements Signalement[]
+}
+
+model Laboratoire {
+    id          Int     @id @default(autoincrement())
+    nom         String
+    code        String  @unique
+    description String?
+
+    responsable_id Int?         @unique
+    responsable    Utilisateur? @relation("ResponsableLabo", fields: [responsable_id], references: [id])
+
+    demandes    Demande[]
+    equipements Equipement[]
+    mouvements  Mouvement[]
+}
+
+model Equipement {
+    id               Int            @id @default(autoincrement())
+    reference        String         @unique
+    designation      String
+    categorie        String
+    etat             EtatEquipement @default(NEUF)
+    quantite         Int
+    prix             Decimal?       @db.Decimal(10, 2)
+    localisation     String?
+    date_acquisition DateTime?
+
+    laboratoire_id Int?
+    laboratoire    Laboratoire? @relation(fields: [laboratoire_id], references: [id])
+
+    demandes     Demande[]
+    mouvements   Mouvement[]
+    signalements Signalement[]
+}
+
+model Demande {
+    id             Int           @id @default(autoincrement())
+    type           TypeDemande
+    statut         StatutDemande @default(EN_ATTENTE)
+    motif          String?
+    date_demande   DateTime      @default(now())
+    demandeur_id   Int
+    demandeur      Utilisateur   @relation("Demandeur", fields: [demandeur_id], references: [id])
+    equipement_id  Int?
+    equipement     Equipement?   @relation(fields: [equipement_id], references: [id])
+    laboratoire_id Int? // ← nouveau
+    laboratoire    Laboratoire?  @relation(fields: [laboratoire_id], references: [id]) // ← nouveau
+    valideur_id    Int?
+    valideur       Utilisateur?  @relation("Valideur", fields: [valideur_id], references: [id])
+}
+
+model Mouvement {
+    id             Int           @id @default(autoincrement())
+    type           TypeMouvement
+    quantite       Int
+    motif          String?
+    date_mouvement DateTime      @default(now())
+
+    equipement_id Int
+    equipement    Equipement @relation(fields: [equipement_id], references: [id])
+
+    magasinier_id Int
+    magasinier    Utilisateur @relation("Magasinier", fields: [magasinier_id], references: [id])
+
+    laboratoire_id Int?
+    laboratoire    Laboratoire? @relation(fields: [laboratoire_id], references: [id])
+}
+
+model Signalement {
+    id            Int         @id @default(autoincrement())
+    description   String
+    statut        String      @default("EN_ATTENTE") // ← nouveau : EN_ATTENTE / EN_COURS / RESOLU
+    date          DateTime    @default(now())
+    equipement_id Int
+    equipement    Equipement  @relation(fields: [equipement_id], references: [id])
+    professeur_id Int
+    professeur    Utilisateur @relation(fields: [professeur_id], references: [id])
+}
